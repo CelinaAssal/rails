@@ -74,6 +74,32 @@ class QueuingTest < ActiveSupport::TestCase
     pass
   end
 
+  test "runs perform_all_later callbacks" do
+    callback_ran = false
+    ActiveJob.before_perform_all_later do |jobs|
+      callback_ran = true
+    end
+    ActiveJob.perform_all_later([TestJob.new(@id).set(wait: 5.seconds)])
+    assert callback_ran
+  ensure
+    ActiveJob::Callbacks.singleton_class.reset_callbacks(:perform_all_later)
+  end
+
+  test "perform_all_later callbacks can reject jobs" do
+    ActiveJob.before_perform_all_later do |jobs|
+      jobs.each { |job| job.successfully_enqueued = false }
+    end
+
+    job = TestJob.new(@id)
+    ActiveJob.perform_all_later([job])
+
+    assert_equal false, job.successfully_enqueued?
+    wait_for_jobs_to_finish_for(2.seconds)
+    assert_job_not_executed
+  ensure
+    ActiveJob::Callbacks.singleton_class.reset_callbacks(:perform_all_later)
+  end
+
   if adapter_is?(:async, :delayed_job, :queue_classic)
     test "should supply a provider_job_id when available for immediate jobs" do
       test_job = TestJob.perform_later @id

@@ -1,3 +1,18 @@
+*   Add `before_perform_all_later`, `around_perform_all_later`, and
+    `after_perform_all_later` callbacks.
+
+    These callbacks are triggered by `perform_all_later` and receive the
+    array of jobs as an argument. Jobs can be rejected in a `before` callback
+    by setting `successfully_enqueued = false`.
+
+    ```ruby
+    ActiveJob.before_perform_all_later do |jobs|
+      jobs.each { |job| job.successfully_enqueued = false if job.arguments.first.nil? }
+    end
+    ```
+
+    *Celina Assal*
+
 *   Deprecate built-in `queue_classic` Active Job adapter.
 
     *Harun Sabljaković, Wojciech Wnętrzak*

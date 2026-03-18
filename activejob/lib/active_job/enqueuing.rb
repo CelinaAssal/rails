@@ -13,23 +13,26 @@ module ActiveJob
     # successfully_enqueued and/or enqueue_error on the passed-in job instances.
     def perform_all_later(*jobs)
       jobs.flatten!
-      jobs.group_by(&:queue_adapter).each do |queue_adapter, adapter_jobs|
-        instrument_enqueue_all(queue_adapter, adapter_jobs) do
-          if queue_adapter.respond_to?(:enqueue_all)
-            queue_adapter.enqueue_all(adapter_jobs)
-          else
-            adapter_jobs.each do |job|
-              job.successfully_enqueued = false
-              if job.scheduled_at
-                queue_adapter.enqueue_at(job, job.scheduled_at.to_f)
-              else
-                queue_adapter.enqueue(job)
+      ActiveJob::Callbacks.run_callbacks :perform_all_later, args: jobs do
+        jobs_to_enqueue = jobs.select { |job| job.successfully_enqueued?.nil? }
+        jobs_to_enqueue.group_by(&:queue_adapter).each do |queue_adapter, adapter_jobs|
+          instrument_enqueue_all(queue_adapter, adapter_jobs) do
+            if queue_adapter.respond_to?(:enqueue_all)
+              queue_adapter.enqueue_all(adapter_jobs)
+            else
+              adapter_jobs.each do |job|
+                job.successfully_enqueued = false
+                if job.scheduled_at
+                  queue_adapter.enqueue_at(job, job.scheduled_at.to_f)
+                else
+                  queue_adapter.enqueue(job)
+                end
+                job.successfully_enqueued = true
+              rescue EnqueueError => e
+                job.enqueue_error = e
               end
-              job.successfully_enqueued = true
-            rescue EnqueueError => e
-              job.enqueue_error = e
+              adapter_jobs.count(&:successfully_enqueued?)
             end
-            adapter_jobs.count(&:successfully_enqueued?)
           end
         end
       end
