@@ -15,6 +15,44 @@ module ActiveJob
   # * <tt>before_perform</tt>
   # * <tt>around_perform</tt>
   # * <tt>after_perform</tt>
+
+  class << self
+    # Defines a callback that will get called right before
+    # +perform_all_later+ enqueues the jobs. The callback receives
+    # the array of jobs as an argument. Jobs can be rejected by
+    # setting +successfully_enqueued = false+ on them, which
+    # prevents them from being enqueued.
+    #
+    #   ActiveJob.before_perform_all_later do |jobs|
+    #     jobs.each { |job| job.successfully_enqueued = false if job.arguments.first.nil? }
+    #   end
+    def before_perform_all_later(*filters, &blk)
+      ActiveJob::Callbacks.singleton_class.set_callback(:perform_all_later, :before, *filters, &blk)
+    end
+
+    # Defines a callback that will get called around
+    # +perform_all_later+'s enqueuing of the jobs.
+    #
+    #   ActiveJob.around_perform_all_later do |jobs, block|
+    #     log "Enqueuing #{jobs.size} jobs"
+    #     block.call
+    #     log "Done enqueuing"
+    #   end
+    def around_perform_all_later(*filters, &blk)
+      ActiveJob::Callbacks.singleton_class.set_callback(:perform_all_later, :around, *filters, &blk)
+    end
+
+    # Defines a callback that will get called right after
+    # +perform_all_later+ has enqueued the jobs.
+    #
+    #   ActiveJob.after_perform_all_later do |jobs|
+    #     log "Enqueued #{jobs.count(&:successfully_enqueued?)} jobs"
+    #   end
+    def after_perform_all_later(*filters, &blk)
+      ActiveJob::Callbacks.singleton_class.set_callback(:perform_all_later, :after, *filters, &blk)
+    end
+  end
+
   module Callbacks
     extend  ActiveSupport::Concern
     include ActiveSupport::Callbacks
@@ -22,6 +60,7 @@ module ActiveJob
     class << self
       include ActiveSupport::Callbacks
       define_callbacks :execute
+      define_callbacks :perform_all_later
     end
 
     included do

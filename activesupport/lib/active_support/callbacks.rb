@@ -94,13 +94,13 @@ module ActiveSupport
     # callback can be as noisy as it likes -- but when control has passed
     # smoothly through and into the supplied block, we want as little evidence
     # as possible that we were here.
-    def run_callbacks(kind, type = nil)
+    def run_callbacks(kind, type = nil, args: nil)
       callbacks = __callbacks[kind.to_sym]
 
       if callbacks.empty?
         yield if block_given?
       else
-        env = Filters::Environment.new(self, false, nil)
+        env = Filters::Environment.new(args || self, false, nil)
 
         next_sequence = callbacks.compile(type)
 
